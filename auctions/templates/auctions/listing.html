@@ -1,0 +1,31 @@
+{% extends "auctions/layout.html" %}
+
+{% block body %}
+    <h2>Listing: {{ listing.title }}</h2>
+
+    <ul>
+        <li>
+            {{ listing.description }}
+        </li>
+        {% if listing.highest_bid > listing.start_price %}
+        <li>
+            $ {{ listing.highest_bid }}
+        </li>
+        {% else %}
+        <li>
+            $ {{ listing.start_price }}
+        </li>
+        {% endif %}
+        <li>
+            {% if message %}
+                {{ message }}
+            {% endif %}
+            <form  method="post">
+                {% csrf_token %}
+                {{ form }}
+                <input type="submit" value="Place Bid">
+            </form>
+        </li>
+    </ul>
+
+{% endblock %}
