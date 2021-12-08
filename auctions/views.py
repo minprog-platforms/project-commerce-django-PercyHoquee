@@ -5,8 +5,9 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse
 from django import forms
+from django.db.models import Max
 
-from .models import Bid, User, Listing
+from .models import Bid, User, Listing, Watchlist
 
 
 class NewListingForm(forms.Form):
@@ -20,10 +21,31 @@ class NewBidForm(forms.Form):
 
 
 def index(request):
-    listings = Listing.objects.all()
+    listings = Listing.objects.filter(status="a")
 
     return render(request, "auctions/index.html", {
-        "listings": listings
+        "listings": listings,
+        "active": "Active Listings"
+    })
+
+
+def closed(request):
+    listings = Listing.objects.filter(status="c")
+
+    return render(request, "auctions/index.html", {
+        "listings": listings,
+        "closed": "Closed Listings"
+    })
+
+
+def watchlist(request):
+    watchlist = Watchlist.objects.get(user=request.user) 
+
+    listings = watchlist.listings.all()
+
+    return render(request, "auctions/index.html", {
+        "listings": listings,
+        "watchlist": "Watchlist"
     })
 
 
@@ -88,7 +110,7 @@ def create(request):
             description = request.POST["description"]
             start_price = request.POST["start_price"]
 
-            listing = Listing(title=title, description=description, start_price=start_price, owner_id=request.user, highest_bid=0)
+            listing = Listing(title=title, description=description, start_price=start_price, owner=request.user, highest_bid=0)
             listing.save()
 
             return HttpResponseRedirect(reverse("index"))
@@ -103,10 +125,29 @@ def create(request):
 
 
 def listing(request, listing_id):
+    listing = Listing.objects.get(id=listing_id)
+
+    listing.set_maximum_bid()
+
+    watchlist = Watchlist.objects.get(user=request.user)
+
+    watchlist_items = watchlist.listings.all()
+
+    if listing in watchlist_items:
+        listed = True
+    else:
+        listed = False
+
+    owner_id = listing.owner.id
+
+    highest_amount = listing.bids.all().aggregate(Max('amount'))["amount__max"]
+
+    highest_bid = Bid.objects.get(amount=highest_amount)
+
+    highest_bidder = highest_bid.bidder.id
+
     if request.method == "POST":
         form = NewBidForm(request.POST)
-
-        listing = Listing.objects.get(id=listing_id)
 
         if form.is_valid():
             amount = int(request.POST["amount"])
@@ -114,11 +155,11 @@ def listing(request, listing_id):
             start_price = listing.start_price
             highest_bid = listing.highest_bid
 
-            if amount >= start_price and amount >= highest_bid:
+            if (amount >= start_price and highest_bid == None) or (amount >= start_price and amount > highest_bid):
                 listing.highest_bid = amount
                 listing.save()
 
-                bid = Bid(amount=amount, bidder_id=request.user, listing_id=listing)
+                bid = Bid(amount=amount, bidder=request.user, listing=listing)
                 bid.save()
 
                 return HttpResponseRedirect(reverse("listing", args=[listing.id]))
@@ -126,18 +167,56 @@ def listing(request, listing_id):
                 return render(request, "auctions/listing.html", {
                 "listing": listing,
                 "form": NewBidForm(request.POST),
+                "listed": listed,
+                "owner_id": owner_id,
+                "highest_bidder": highest_bidder,
                 "message": "Bid Higher Please"
             })
         else:
             return render(request, "auctions/listing.html", {
                 "listing": listing,
                 "form": NewBidForm(request.POST),
+                "listed": listed,
+                "highest_bidder": highest_bidder,
+                "owner_id": owner_id
             })
     else:
-        listing = Listing.objects.get(id=listing_id)
-
         return render(request, "auctions/listing.html", {
             "listing": listing,
-            "form": NewBidForm()
+            "form": NewBidForm(),
+            "listed": listed,
+            "highest_bidder": highest_bidder,
+            "owner_id": owner_id
         })
+
+
+def add(request, listing_id):
+    watchlist = Watchlist.objects.get(user=request.user)
+
+    listing = Listing.objects.get(id=listing_id)
+
+    watchlist.listings.add(listing)
+
+    return HttpResponseRedirect(reverse("listing", args=[listing.id]))
+
+
+def remove(request, listing_id):
+    watchlist = Watchlist.objects.get(user=request.user)
+
+    listing = Listing.objects.get(id=listing_id)
+
+    watchlist.listings.remove(listing)
+
+    return HttpResponseRedirect(reverse("listing", args=[listing.id]))
+
+
+def close_listing(request, listing_id):
+    listing = Listing.objects.get(id=listing_id)
+
+    listing.status = "c"
+    listing.save()
+
+    return HttpResponseRedirect(reverse("listing", args=[listing.id]))
+
+
 

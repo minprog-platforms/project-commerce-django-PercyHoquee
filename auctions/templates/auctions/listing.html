@@ -3,29 +3,58 @@
 {% block body %}
     <h2>Listing: {{ listing.title }}</h2>
 
+    {% if listed %}
+        Watchlisted
+        <a href="{{ listing.id }}/remove">Remove From Watchlist</a>
+    {% else %}
+        <a href="{{ listing.id }}/add">Add To Watchlist</a>
+    {% endif %}
+
     <ul>
         <li>
             {{ listing.description }}
         </li>
-        {% if listing.highest_bid > listing.start_price %}
+    {% if listing.highest_bid > listing.start_price %}
         <li>
             $ {{ listing.highest_bid }}
         </li>
-        {% else %}
+    {% else %}
         <li>
             $ {{ listing.start_price }}
         </li>
-        {% endif %}
-        <li>
+    {% endif %}
+        
+    {% if listing.status == "a" %}
+        {% if owner_id == user.id %}
+            <li>
+                <a href="{{ listing.id }}/close_listing">Close Listing</a>
+            </li>
+        {% else %}
+            <li>
             {% if message %}
                 {{ message }}
             {% endif %}
-            <form  method="post">
-                {% csrf_token %}
-                {{ form }}
-                <input type="submit" value="Place Bid">
-            </form>
-        </li>
+                <form  method="post">
+                    {% csrf_token %}
+                    {{ form }}
+                    <input type="submit" value="Place Bid">
+                </form>
+            </li>
+        {% endif %}
+    {% else %}
+        {% if owner_id == user.id %}
+            <li>
+                You Have Closed This Listing
+            </li>
+        {% else %}
+            <li>
+                This Listing Is Closed.
+            {% if highest_bidder == user.id %}
+                You Have Won This Listing!
+            {% endif %}
+            </li>
+        {% endif %}
+    {% endif %}
+    
     </ul>
-
 {% endblock %}
