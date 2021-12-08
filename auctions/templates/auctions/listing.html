@@ -54,7 +54,22 @@
             {% endif %}
             </li>
         {% endif %}
-    {% endif %}
-    
+    {% endif %} 
     </ul>
+    <div>
+        {% if user.is_authenticated %}
+            <form action="{{ listing.id }}/comment" method="POST">
+                {% csrf_token %}
+                {{ comment_form }}
+                <input type="submit" value="Submit Comment">
+            </form>
+        {% endif %}
+        <ul>
+            {% for comment in comments %}
+                <li>
+                    {{ comment.text }}
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
 {% endblock %}

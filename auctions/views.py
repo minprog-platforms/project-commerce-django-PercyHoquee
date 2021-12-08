@@ -7,7 +7,7 @@ from django.urls import reverse
 from django import forms
 from django.db.models import Max
 
-from .models import Bid, User, Listing, Watchlist
+from .models import Bid, User, Listing, Watchlist, Comment
 
 
 class NewListingForm(forms.Form):
@@ -18,6 +18,9 @@ class NewListingForm(forms.Form):
 
 class NewBidForm(forms.Form):
     amount = forms.IntegerField()
+
+class NewCommentForm(forms.Form):
+    text = forms.CharField(max_length=200)
 
 
 def index(request):
@@ -91,6 +94,9 @@ def register(request):
         try:
             user = User.objects.create_user(username, email, password)
             user.save()
+
+            watchlist = Watchlist(user=user)
+            watchlist.save()
         except IntegrityError:
             return render(request, "auctions/register.html", {
                 "message": "Username already taken."
@@ -142,9 +148,14 @@ def listing(request, listing_id):
 
     highest_amount = listing.bids.all().aggregate(Max('amount'))["amount__max"]
 
-    highest_bid = Bid.objects.get(amount=highest_amount)
+    if highest_amount != None:
+        highest_bid = Bid.objects.get(amount=highest_amount)
 
-    highest_bidder = highest_bid.bidder.id
+        highest_bidder = highest_bid.bidder.id
+    else:
+        highest_bidder = None
+
+    comments = listing.comments.all()
 
     if request.method == "POST":
         form = NewBidForm(request.POST)
@@ -170,6 +181,8 @@ def listing(request, listing_id):
                 "listed": listed,
                 "owner_id": owner_id,
                 "highest_bidder": highest_bidder,
+                "comments": comments,
+                "comment_form": NewCommentForm(),
                 "message": "Bid Higher Please"
             })
         else:
@@ -178,6 +191,8 @@ def listing(request, listing_id):
                 "form": NewBidForm(request.POST),
                 "listed": listed,
                 "highest_bidder": highest_bidder,
+                "comments": comments,
+                "comment_form": NewCommentForm(),
                 "owner_id": owner_id
             })
     else:
@@ -186,6 +201,8 @@ def listing(request, listing_id):
             "form": NewBidForm(),
             "listed": listed,
             "highest_bidder": highest_bidder,
+            "comments": comments,
+            "comment_form": NewCommentForm(),
             "owner_id": owner_id
         })
 
@@ -215,6 +232,17 @@ def close_listing(request, listing_id):
 
     listing.status = "c"
     listing.save()
+
+    return HttpResponseRedirect(reverse("listing", args=[listing.id]))
+
+
+def comment(request, listing_id):
+    text = request.POST["text"]
+
+    listing = Listing.objects.get(id=listing_id)
+
+    comment = Comment(text=text, commenter=request.user, listing=listing)
+    comment.save()
 
     return HttpResponseRedirect(reverse("listing", args=[listing.id]))
 

@@ -37,7 +37,7 @@ class Bid(models.Model):
 class Comment(models.Model):
     text = CharField(max_length=200)
     commenter = ForeignKey(User, on_delete=models.CASCADE)
-    listing = ForeignKey(Listing, on_delete=models.CASCADE)
+    listing = ForeignKey(Listing, on_delete=models.CASCADE, related_name="comments")
 
 
 class Watchlist(models.Model):
